@@ -2,7 +2,7 @@
   <div class='map-container'>
     <gmap-map
       :center='center'
-      :zoom='13'
+      :zoom='12'
     >
       <gmap-marker
         :key='index'
@@ -13,7 +13,7 @@
         @click='openDialog(index)'
       ></gmap-marker>
       <gmap-marker
-        v-if='currentPosition'
+        v-if='Object.keys(currentPosition).length !== 0'
         :position='currentPosition'
         icon='./static/currentlocation.png'
       ></gmap-marker>
@@ -25,6 +25,16 @@
       ref='dialog-index'
       >
     </cafe-dialog>
+    <cafe-list 
+      :key='index'
+      :currentPosition='currentPosition'
+      v-for='(cafe, index) in markers' 
+      :cafe=cafe
+      :index=index
+      ref='cafe-list-index'
+      class="cafe-list"
+      >
+    </cafe-list>
   </div>
 </template>
 
@@ -33,6 +43,8 @@
 
   import backand from '@backand/vanilla-sdk'
   import CafeDialog from './cafe-dialog.vue'
+  import CafeList from './cafe-list.vue'
+  import UtilMixin from './util-mixin'
   import EventBus from '../event-bus'
 
   export default {
@@ -42,9 +54,10 @@
         // center is gangnam
         center: {lat: 37.506293, lng: 127.019357},
         markers: [],
-        currentPosition: false
+        currentPosition: {}
       }
     },
+    mixins: [UtilMixin],
     beforeRouteEnter (to, from, next) {
       backand.object.getList('Cafe', {
         'pageSize': 50,
@@ -58,7 +71,8 @@
             name: cafe.name,
             address: cafe.address,
             description: cafe.description,
-            website: cafe.website
+            website: cafe.website,
+            photo: cafe.photo
           }
         })
         next()
@@ -86,7 +100,8 @@
                 address: cafe.address,
                 description: cafe.description,
                 website: cafe.website,
-                photo: cafe.photo
+                photo: cafe.photo,
+                distance: null
               }
             })
           })
@@ -98,7 +113,7 @@
         this.$refs['dialog-index'][index].viewDialog()
       }
     },
-    components: { CafeDialog },
+    components: { CafeDialog, CafeList },
     mounted () {
       this.fetchCafes()
     },
@@ -106,6 +121,16 @@
       EventBus.$on('geolocate', (coords) => {
         this.currentPosition = {lat: coords.latitude, lng: coords.longitude}
         this.center = {lat: coords.latitude, lng: coords.longitude}
+        console.log(this.markers)
+        this.markers = this.markers.map((marker) => {
+          marker.distance = this.distance(this.currentPosition, marker.position)
+          return marker
+        })
+        this.markers = this.markers.sort((marker1, marker2) => { return Number(marker1.distance) > Number(marker2.distance) })
+      })
+      EventBus.$on('openDialog', (index) => {
+        this.center = this.markers[index].position
+        this.$refs['dialog-index'][index].viewDialog()
       })
     }
   }
@@ -115,9 +140,17 @@
 <style scoped>
   .vue-map-container {
     width: 100vw;
-    height: calc(100vh - 60px);
+    height: calc(50vh - 60px);
+  }
+  
+  .cafe-list {
+
   }
 
+  .cafe-list:nth-child(2n) {
+    background-color: #8492A6;
+    color: white;
+  }
 
 </style>
 
